@@ -8,6 +8,7 @@ def save_file(path, obj):
     except Exception as err:
         print(err)
 
+
 def load_file(path):
     try:
         with open(path, "rb") as fp:

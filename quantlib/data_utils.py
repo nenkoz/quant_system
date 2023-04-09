@@ -18,7 +18,7 @@ def get_sp500_df():
     ohlcvs = {}
     symbols = symbols[:30]
     for symbol in symbols:
-        symbol_df = yf.Ticker(symbol).history(period="10y") #Gives the OHLCV Dividents + Stock Splits
+        symbol_df = yf.Ticker(symbol).history(period="10y")  # Gives the OHLCV Dividends + Stock Splits
         print(symbol_df)
         # Interested in OHLCV, renaming them
         ohlcvs[symbol] = symbol_df[["Open", "High", "Low", "Close", "Volume"]].rename(
@@ -73,6 +73,7 @@ def format_date(date):
     # convert 2020-01-02 00:00:00 >> datetime.date(2020, 01, 02)
     yymmdd = list(map(lambda x: int(x), str(date).split(" ")[0].split("-")))
     return datetime.date(yymmdd[0], yymmdd[1], yymmdd[2])
+
 
 """
 Note:
