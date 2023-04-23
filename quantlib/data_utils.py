@@ -1,26 +1,28 @@
 import requests
-import pandas as pd
-import yfinance as yf
 import datetime
-from bs4 import BeautifulSoup
+import pandas as pd
+import yfinance as yf  # python3 -m pip install yFinance
+from bs4 import BeautifulSoup  # python3 -m pip insall bs4
 
 
 def get_sp500_instruments():
     res = requests.get("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
-    soup = BeautifulSoup(res.content,'lxml')
+    soup = BeautifulSoup(res.content, 'lxml')
     table = soup.find_all('table')[0]
     df = pd.read_html(str(table))
     return list(df[0]["Symbol"])
 
 
+# now we want to get the data for it
+# look at documentation!: pypi.org/project/yfinance
 def get_sp500_df():
     symbols = get_sp500_instruments()
-    ohlcvs = {}
+    # to save time, let us perform ohlcv retrieval for 30 stocks
     symbols = symbols[:30]
+    ohlcvs = {}
     for symbol in symbols:
-        symbol_df = yf.Ticker(symbol).history(period="10y")  # Gives the OHLCV Dividends + Stock Splits
-        print(symbol_df)
-        # Interested in OHLCV, renaming them
+        symbol_df = yf.Ticker(symbol).history(period="10y")  # this gives us the OHLCV Dividends + Stock Splits
+        # we are interested in the OHLCV mainly, let's rename them
         ohlcvs[symbol] = symbol_df[["Open", "High", "Low", "Close", "Volume"]].rename(
             columns={
                 "Open": "open",
@@ -30,23 +32,26 @@ def get_sp500_df():
                 "Volume": "volume"
             }
         )
+        print(symbol)
+        print(ohlcvs[symbol])  # we can now get the data that we want inside a nicely formatted df
 
+    # now, we want to put that all into a single dataframe.
+    # since the columns need to be unique to identify the instrument, we want to add an identifier.
+    # let's steal the GOOGL index as our dataframe index
     df = pd.DataFrame(index=ohlcvs["GOOGL"].index)
     df.index.name = "date"
     instruments = list(ohlcvs.keys())
 
     for inst in instruments:
         inst_df = ohlcvs[inst]
-        # Transforming open, high, ... to AAPL open, AAPL high and so on
-        columns = list(map(lambda x: "{} {}".format(inst, x), inst_df.columns))
+        columns = list(map(lambda x: "{} {}".format(inst, x), inst_df.columns))  # this tranforms open, high... to AAPL open , AAPL high and so on
         df[columns] = inst_df
 
     return df, instruments
 
 
-# adding some statistics to the price/vol data
+# take an ohlcv df and add some other statistics
 def extend_dataframe(traded, df):
-    # standardizing the index of the dataframe
     df.index = pd.Series(df.index).apply(lambda x: format_date(x))
     open_cols = list(map(lambda x: str(x) + " open", traded))
     high_cols = list(map(lambda x: str(x) + " high", traded))
@@ -54,23 +59,22 @@ def extend_dataframe(traded, df):
     close_cols = list(map(lambda x: str(x) + " close", traded))
     volume_cols = list(map(lambda x: str(x) + " volume", traded))
     historical_data = df.copy()
-    historical_data = historical_data[open_cols + high_cols + low_cols + close_cols + volume_cols]
-    historical_data.fillna(method="ffill", inplace=True)  # forward fill
-    historical_data.fillna(method="bfill", inplace=True)  # backward fill
+    historical_data = historical_data[open_cols + high_cols + low_cols + close_cols + volume_cols]  # get a df with ohlcv for all traded instruments
+    historical_data.fillna(method="ffill", inplace=True)
+    historical_data.fillna(method="bfill", inplace=True)
+
     for inst in traded:
-        # close to close return stats
-        historical_data["{} % ret".format(inst)] = historical_data["{} close".format(inst)] / \
-                                                   historical_data["{} close".format(inst)].shift(1) - 1
-        # historical standard deviation of returns as realised volatility proxy
-        historical_data["{} % ret vol".format(inst)] = historical_data["{} % ret".format(inst)].rolling(25).std()
-        # testing if ticker is actively traded
-        historical_data["{} active".format(inst)] = historical_data["{} close".format(inst)] != \
-            historical_data["{} close".format(inst)].shift(1)
+        historical_data["{} % ret".format(inst)] = historical_data["{} close".format(inst)] / historical_data["{} close".format(inst)].shift(
+            1) - 1  # close to close return statistic
+        historical_data["{} % ret vol".format(inst)] = historical_data["{} % ret".format(inst)].rolling(
+            25).std()  # historical rolling standard deviation of returns as realised volatility proxy
+        # test if stock is actively trading by using rough measure of non-zero price change from previous time step
+        historical_data["{} active".format(inst)] = historical_data["{} close".format(inst)] != historical_data["{} close".format(inst)].shift(1)
     return historical_data
 
 
 def format_date(date):
-    # convert 2020-01-02 00:00:00 >> datetime.date(2020, 01, 02)
+    # convert 2012-02-06 00:00:00 >> datetime.date(2012, 2, 6)
     yymmdd = list(map(lambda x: int(x), str(date).split(" ")[0].split("-")))
     return datetime.date(yymmdd[0], yymmdd[1], yymmdd[2])
 

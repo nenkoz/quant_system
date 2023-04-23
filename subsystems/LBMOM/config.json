@@ -4,6 +4,7 @@
         "AOS",
         "ABT",
         "ABBV",
+        "ABMD",
         "ACN",
         "ATVI",
         "ADM",
@@ -13,6 +14,7 @@
         "AES",
         "AFL",
         "A",
+        "AIG",
         "APD",
         "AKAM",
         "ALK",
@@ -27,8 +29,6 @@
         "MO",
         "AMZN",
         "AMCR",
-        "AMD",
-        "AEE",
-        "AAL"
+        "AMD"
     ]
 }
