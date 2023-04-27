@@ -21,7 +21,6 @@ class TradeClient():
         self.token = auth_config["oan_token"]
         self.env = auth_config["oan_env"]
         self.client = oandapyV20.API(access_token=self.token, environment=self.env)
-        print(self.client)
 
     """
     Interested in getting 
@@ -104,14 +103,12 @@ class TradeClient():
         ddmmyy = series.split("T")[0].split("-")
         return datetime.date(int(ddmmyy[0]), int(ddmmyy[1]), int(ddmmyy[2]))
 
-
     def get_ohlcv(self, instrument, count, granularity):
         try:
             params = {"count": count, "granularity": granularity}
             candles = instruments.InstrumentsCandles(instrument=instrument, params=params)
             self.client.request(candles)
             ohlcv_dict = candles.response["candles"]
-            print(ohlcv_dict)
             ohlcv = pd.DataFrame(ohlcv_dict)
             ohlcv = ohlcv[ohlcv["complete"]] # taking only the completed candles
             ohlcv_df = ohlcv["mid"].dropna().apply(pd.Series) # converts the dictionary in every row into a separate columns
@@ -121,10 +118,9 @@ class TradeClient():
             ohlcv_df.reset_index(inplace=True) # adds an index 0,1,2,...
             ohlcv_df.columns = ["date", "open", "high", "low", "close", "volume"]
             ohlcv_df["date"] = ohlcv_df["date"].apply(lambda x: self.format_date(x))
+            return ohlcv_df
         except Exception as err:
             print(err)
-
-        print(ohlcv_df)
 
     def market_order(self, inst, order_config={}):
         pass

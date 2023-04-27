@@ -12,29 +12,49 @@ from brokerage.oanda.oanda import Oanda
 with open("config/auth_config.json", "r") as f:
     auth_config = json.load(f)
 
-df, instruments = gu.load_file("./Data/data.obj")
-print(df, instruments)
+with open("config/oan_config.json", "r") as f:
+    brokerage_config = json.load(f)
 
-#run simulation for 5 years
 VOL_TARGET = 0.20
-sim_start = df.index[-1] - relativedelta(years=1)
 
-oanda = Oanda(auth_config=auth_config)
+brokerage = Oanda(auth_config=auth_config)
+db_instruments = brokerage_config["fx"] + brokerage_config["indices"] + brokerage_config["commodities"] + brokerage_config["bonds"]
 
-trade_client = oanda.get_trade_client()
+"""
+Load dataframe
+"""
+database_df = gu.load_file("./data/oan_ohlcv.obj")
 
-trade_client.get_ohlcv("USD_JPY", 100, "D")
-exit()
-instruments, currencies, cfds, metals, tags = trade_client.get_account_instruments()
+# poll_df = pd.DataFrame()
+# for db_inst in db_instruments:
+#     df = brokerage.get_trade_client().get_ohlcv(instrument=db_inst, count=50, granularity="D")
+#     df.set_index("date", inplace=True)
+#
+#     cols = list(map(lambda x: "{} {}".format(db_inst, x), df.columns))  # adds identifier
+#     df.columns = cols
+#     if len(poll_df) == 0:
+#         poll_df[cols] = df
+#     else:
+#         poll_df = poll_df.combine_first(df)  # inefficient but combines the dataframes without losing data
+#
+# print("BEFORE :", database_df)
+# database_df = database_df.loc[:poll_df.index[0]][:-1]  # dropping the last overlapping data point
+# database_df = pd.concat([database_df, poll_df])
+# print("NEW :", poll_df)
+# print("COMBINED :", database_df)
+# gu.save_file("./data/oan_ohlcv.obj", database_df)
 
-print(currencies)
-print(cfds)
-print(metals)
-print(tags)
-# results = trade_client.get_account_instruments()
-# print(json.dumps(results, indent= 2))
-exit()
+"""
+Extend the database
+"""
+historical_data = du.extend_dataframe(traded=db_instruments, df=database_df)
 
-strat = Lbmom(instruments_config="./subsystems/LBMOM/config.json", historical_df=df, simulation_start=sim_start, vol_target=VOL_TARGET)
-strat.get_subsys_pos()
+
+#
+# trade_client = brokerage.get_trade_client()
+#
+# exit()
+#
+# strat = Lbmom(instruments_config="./subsystems/LBMOM/config.json", historical_df=df, simulation_start=sim_start, vol_target=VOL_TARGET)
+# strat.get_subsys_pos()
 
