@@ -9,7 +9,9 @@ def get_backtest_day_stats(portfolio_df, instruments, date, date_prev, date_idx,
         previous_holdings = portfolio_df.loc[date_idx - 1, "{} units".format(inst)]
         if previous_holdings != 0:
             price_change = historical_data.loc[date, "{} close".format(inst)] - historical_data.loc[date_prev, "{} close".format(inst)]
-            dollar_change = price_change * 1  # FX Conversion, for now assume all USD
+
+            dollar_change = unit_val_change(from_prod=inst, val_change=price_change, historical_data=historical_data, date=date_prev)  # FX Conversion
+
             inst_pnl = dollar_change * previous_holdings
             pnl += inst_pnl
             nominal_ret += portfolio_df.loc[date_idx - 1, "{} w".format(inst)] * historical_data.loc[date, "{} % ret".format(inst)]
@@ -34,3 +36,38 @@ def get_strat_scaler(portfolio_df, lookback, vol_target, idx, default):
     else:
         # not enough data, just return a default value
         return default
+
+
+def unit_val_change(from_prod, val_change, historical_data, date):
+    """
+
+    :param from_prod: instrument traded, e.g. HK33_HKD
+    :param val_change: change in price quote
+    :param historical_data:
+    :param date:
+    :return:
+    """
+    is_denominated = len(from_prod.split("_")) == 2
+    if not is_denominated:
+        return val_change  # assume USD denomination, e.g. AAPL
+    elif is_denominated and from_prod.split("_")[1] == "USD":
+        return val_change  # USD denominated, e.g. AAPL_USD
+    else:
+        # e.g. HK33_HKD, USD_JPY (X_Y)
+        # take delta price * (Y_USD)
+        return val_change * historical_data.loc[date, "{}_USD close".format(from_prod.split("_")[1])]
+
+
+def unit_dollar_value(from_prod, historical_data, date):
+    #  how much is 1 contract worth
+    is_denominated = len(from_prod.split("_")) == 2
+    if not is_denominated:
+        return historical_data.loc[date, "{} close".format(date)]  # e.g. AAPL units is worth the price of 1 AAPL unit
+    if is_denominated and len(from_prod.split("_")[1]) == "USD":
+        return 1
+    if is_denominated and not from_prod.split("_")[0] == "USD":
+        #  e.g.  HK33_USD, EUR_USD, (X_Y) -> then you want to take the price change in the denominated currency, which is unit_price * (Y_USD)
+        unit_price = historical_data.loc[date, "{} close".format(from_prod)]
+        fx_inst = "{}_{}".format(from_prod.split("_")[1], "USD")
+        fx_quote = 1 if fx_inst == "USD_USD" else historical_data.loc[date, "{} close".format(fx_inst)]
+        return unit_price * fx_quote

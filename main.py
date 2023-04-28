@@ -1,6 +1,7 @@
 import json
-import pandas as pd
+import datetime
 
+import pandas as pd
 from dateutil.relativedelta import relativedelta
 
 import quantlib.data_utils as du
@@ -9,13 +10,21 @@ import quantlib.general_utils as gu
 from subsystems.LBMOM.subsys import Lbmom
 from brokerage.oanda.oanda import Oanda
 
+
+import matplotlib.pyplot as plt
+df = pd.read_excel("lbmom.xlsx")
+(1 + df["capital ret"]).cumprod().plot()
+plt.show()
+
+exit()
 with open("config/auth_config.json", "r") as f:
     auth_config = json.load(f)
 
+with open("config/portfolio_config.json", "r") as f:
+    portfolio_config = json.load(f)
+
 with open("config/oan_config.json", "r") as f:
     brokerage_config = json.load(f)
-
-VOL_TARGET = 0.20
 
 brokerage = Oanda(auth_config=auth_config)
 db_instruments = brokerage_config["fx"] + brokerage_config["indices"] + brokerage_config["commodities"] + brokerage_config["bonds"]
@@ -50,11 +59,18 @@ Extend the database
 historical_data = du.extend_dataframe(traded=db_instruments, df=database_df, fx_codes=brokerage_config["fx_codes"])
 print(list(historical_data))
 
-#
+"""
+Risk Parameters
+"""
+VOL_TARGET = portfolio_config["vol_target"]
+sim_start = datetime.date.today() - relativedelta(years=portfolio_config["sim_years"])
+
+"""
+Get Positions of subsystems
+"""
 # trade_client = brokerage.get_trade_client()
-#
-# exit()
-#
-# strat = Lbmom(instruments_config="./subsystems/LBMOM/config.json", historical_df=df, simulation_start=sim_start, vol_target=VOL_TARGET)
-# strat.get_subsys_pos()
+
+strat = Lbmom(instruments_config="./subsystems/LBMOM/config.json", historical_df=historical_data, simulation_start=sim_start, vol_target=VOL_TARGET,
+              brokerage_used="oan")
+strat.get_subsys_pos()
 
