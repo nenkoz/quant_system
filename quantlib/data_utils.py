@@ -51,7 +51,7 @@ def get_sp500_df():
 
 
 # take an ohlcv df and add some other statistics
-def extend_dataframe(traded, df):
+def extend_dataframe(traded, df, fx_codes):
     df.index = pd.Series(df.index).apply(lambda x: format_date(x))
     open_cols = list(map(lambda x: str(x) + " open", traded))
     high_cols = list(map(lambda x: str(x) + " high", traded))
@@ -64,13 +64,27 @@ def extend_dataframe(traded, df):
     historical_data.fillna(method="bfill", inplace=True)
 
     for inst in traded:
-        historical_data["{} % ret".format(inst)] = historical_data["{} close".format(inst)] / historical_data["{} close".format(inst)].shift(
-            1) - 1  # close to close return statistic
-        historical_data["{} % ret vol".format(inst)] = historical_data["{} % ret".format(inst)].rolling(
-            25).std()  # historical rolling standard deviation of returns as realised volatility proxy
+        # close to close return statistic
+        historical_data["{} % ret".format(inst)] = historical_data["{} close".format(inst)] / historical_data["{} close".format(inst)].shift(1) - 1
+        # historical rolling standard deviation of returns as realised volatility proxy
+        historical_data["{} % ret vol".format(inst)] = historical_data["{} % ret".format(inst)].rolling(25).std()
         # test if stock is actively trading by using rough measure of non-zero price change from previous time step
         historical_data["{} active".format(inst)] = historical_data["{} close".format(inst)] != historical_data["{} close".format(inst)].shift(1)
+
+        if is_fx(inst=inst, fx_codes=fx_codes):
+            inst_rev = "{}_{}".format(inst.split("_")[1], inst.split("_")[0])
+            historical_data["{} close".format(inst_rev)] = 1/historical_data["{} close".format(inst)]
+            historical_data["{} % ret".format(inst_rev)] = historical_data["{} close".format(inst_rev)] / historical_data["{} close".format(
+                inst_rev)].shift(1)-1
+            historical_data["{} % ret vol".format(inst_rev)] = historical_data["{} % ret".format(inst_rev)].rolling(25).std()
+            historical_data["{} active".format(inst_rev)] = historical_data["{} close".format(inst_rev)] != historical_data["{} close".format(
+                inst_rev)].shift(1)
+
     return historical_data
+
+
+def is_fx(inst, fx_codes):
+    return len(inst.split("_")) == 2 and inst.split("_")[0] in fx_codes and inst.split("_")[1] in fx_codes
 
 
 def format_date(date):

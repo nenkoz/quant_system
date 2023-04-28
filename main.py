@@ -47,8 +47,8 @@ database_df = gu.load_file("./data/oan_ohlcv.obj")
 """
 Extend the database
 """
-historical_data = du.extend_dataframe(traded=db_instruments, df=database_df)
-
+historical_data = du.extend_dataframe(traded=db_instruments, df=database_df, fx_codes=brokerage_config["fx_codes"])
+print(list(historical_data))
 
 #
 # trade_client = brokerage.get_trade_client()
