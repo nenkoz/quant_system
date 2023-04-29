@@ -8,6 +8,7 @@ import quantlib.general_utils as gu
 
 from brokerage.oanda.oanda import Oanda
 from subsystems.LBMOM.subsys import Lbmom
+from subsystems.LSMOM.subsys import Lsmom
 
 with open("config/auth_config.json", "r") as f:
     auth_config = json.load(f)
@@ -71,20 +72,26 @@ def main():
     strats = {}
 
     for subsystem in subsystems_config.keys():
+        print(subsystem)
         if subsystem == "lbmom":
             strat = Lbmom(instruments_config=portfolio_config["instruments_config"][subsystem]["oan"],
                           historical_df=historical_data,
                           simulation_start=sim_start,
                           vol_target=VOL_TARGET,
                           brokerage_used="oan")
-        elif subsystem == "":
-            pass
+        elif subsystem == "lsmom":
+            strat = Lsmom(instruments_config=portfolio_config["instruments_config"][subsystem]["oan"],
+                          historical_df=historical_data,
+                          simulation_start=sim_start,
+                          vol_target=VOL_TARGET,
+                          brokerage_used="oan")
         else:
             pass
         strats[subsystem] = strat
 
     for k, v in strats.items():
-        #  the key, value pair of strategy name, strategy object
+        print("run: ", k, v)
+        #  the key, value pair of strategy name, strategy objeçct
         strat_db, strat_inst = v.get_subsys_pos(debug=True)
         print(strat_db, strat_inst)
 
