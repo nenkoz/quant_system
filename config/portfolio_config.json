@@ -1,5 +1,5 @@
 {
-  "sim_years" : 0.1,
+  "sim_years" : 1,
   "brokerage" : "oan",
   "vol_target" : 0.2,
 

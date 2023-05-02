@@ -19,14 +19,21 @@ with open("config/portfolio_config.json", "r") as f:
 with open("config/oan_config.json", "r") as f:
     brokerage_config = json.load(f)
 
-def main():
+brokerage_used = "oan"
+if brokerage_used == "oan":
     brokerage = Oanda(auth_config=auth_config)
+else:
+    pass
+
+
+def main():
     db_instruments = brokerage_config["fx"] + brokerage_config["indices"] + brokerage_config["commodities"] + brokerage_config["bonds"]
 
     """
     Load dataframe
     """
     database_df = gu.load_file("./data/oan_ohlcv.obj")
+    print(database_df)
 
     # poll_df = pd.DataFrame()
     # for db_inst in db_instruments:
@@ -68,23 +75,24 @@ def main():
     """
     Get Positions of subsystems
     """
-    subsystems_config = portfolio_config["subsystems"]["oan"]
+    subsystems_config = portfolio_config["subsystems"][brokerage_used]
     strats = {}
 
     for subsystem in subsystems_config.keys():
-        print(subsystem)
         if subsystem == "lbmom":
-            strat = Lbmom(instruments_config=portfolio_config["instruments_config"][subsystem]["oan"],
-                          historical_df=historical_data,
-                          simulation_start=sim_start,
-                          vol_target=VOL_TARGET,
-                          brokerage_used="oan")
+            strat = Lbmom(
+                instruments_config=portfolio_config["instruments_config"][subsystem][brokerage_used],
+                historical_df=historical_data,
+                simulation_start=sim_start,
+                vol_target=VOL_TARGET,
+                brokerage_used=brokerage_used
+            )
         elif subsystem == "lsmom":
-            strat = Lsmom(instruments_config=portfolio_config["instruments_config"][subsystem]["oan"],
+            strat = Lsmom(instruments_config=portfolio_config["instruments_config"][subsystem][brokerage_used],
                           historical_df=historical_data,
                           simulation_start=sim_start,
                           vol_target=VOL_TARGET,
-                          brokerage_used="oan")
+                          brokerage_used=brokerage_used)
         else:
             pass
         strats[subsystem] = strat
