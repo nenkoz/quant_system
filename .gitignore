@@ -233,3 +233,4 @@ diagnostics/*
 data/*
 ./lbmom.xslx
 
+*.xlsx
