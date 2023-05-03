@@ -281,7 +281,18 @@ def main():
     Open new positions
     """
     for inst_unheld in instruments_unheld:
-        pass
+        Printer.pretty(left="\n******************************************************", color=Colors.YELLOW)
+        order_config = brokerage.get_service_client().get_order_specs(
+            inst=inst_unheld,
+            units=portfolio_optimal[inst_unheld]["scaled_units"],
+            current_contracts=0
+        )
+        if order_config["rounded_contracts"] != 0:
+            print_inst_details(order_config, False)
+            print_order_details(order_config["rounded_contracts"])
+            if portfolio_config["order_enabled"]:
+                brokerage.get_trade_client().market_order(inst=inst_unheld, order_config=order_config)
+        Printer.pretty(left="******************************************************\n", color=Colors.YELLOW)
 
 
 if __name__ == "__main__":
