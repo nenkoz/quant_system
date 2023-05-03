@@ -93,6 +93,8 @@ def run_simulation(instruments, historical_data, portfolio_vol, subsystems_dict,
                 portfolio_df.loc[i, "{} w".format(inst)] = inst_w
             else:
                 portfolio_df.loc[i, "{} w".format(inst)] = 0
+
+        nominal_total = backtest_utils.set_leverage_cap(portfolio_df, instruments, date, i, nominal_total, 10, historical_data)
         """
         Perform Calculations for Date
         """
