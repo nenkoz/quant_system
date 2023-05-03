@@ -1,28 +1,35 @@
-# [(44, 100), (156, 245), (23, 184), (176, 290), (215, 288), (245, 298), (59, 127), (134, 275), (220, 286), (60, 168), (208, 249), (19, 152),
-# (38, 122), (234, 254), (227, 293), (64, 186), (28, 49), (22, 106), (25, 212), (144, 148), (260, 284)]
-
 import json
 import numpy as np
 import pandas as pd
+
+from scipy.stats import skew
 
 import quantlib.backtest_utils as backtest_utils
 import quantlib.indicators_cal as indicators_cal
 import quantlib.general_utils as general_utils
 import quantlib.diagnostics_utils as diagnostic_utils
 
+"""
+The skewness strategy is about being long the negative skew of historical returns and being short the positive skew thus creating market neutral
+portfolio. It is well documented on commodity futures.
 
-class Lbmom:
+The basic version implemented here can be improved by:
+1. Decomposing skewness into systematic and idiosyncratic skew. Skew factor harvesting on commodity returns are documented to show stronger
+performance when done on idiosyncratic momentum. We can do this by regressing the returns on a market index and taking the skew on regression
+residuals.
+2. The asset universe used here is rather limited. Better results could be obtained with larger asset universe as well as continuous funtion for the 
+positioning rather than the binary long or short position we have now.
+"""
+class Skprm:
 
     def __init__(self, instruments_config, historical_df, simulation_start, vol_target, brokerage_used):
-        self.pairs = [(44, 100), (156, 245), (23, 184), (176, 290), (215, 288), (245, 298), (59, 127), (134, 275), (220, 286), (60, 168), (208, 249),
-                      (19, 152), (38, 122), (234, 254), (227, 293), (64, 186), (28, 49), (22, 106), (25, 212), (144, 148), (260, 284)]
         self.historical_df = historical_df
         self.simulation_start = simulation_start
-        self.vol_target = vol_target  # we adopt the volatility targetting risk framework.
+        self.vol_target = vol_target  # we adopt the volatility targeting risk framework.
         with open(instruments_config) as f:
             self.instruments_config = json.load(f)
         self.brokerage_used = brokerage_used
-        self.sysname = "LBMOM"
+        self.sysname = "SKPRM"
 
     """
     Strategy API:
@@ -31,31 +38,19 @@ class Lbmom:
     """
 
     def extend_historicals(self, instruments, historical_data):
-        # we need to obtain data with regards to the LBMOM strategy
-        # in particular, we want the moving averages, which is a proxy for momentum factor
-        # we also want a univariate statistical factor as an indicator of regime. We use the average directional index ADX as a proxy for momentum
-        # regime indicator
-        for inst in instruments:
-            historical_data["{} adx".format(inst)] = indicators_cal.adx_series(
-                high=historical_data["{} high".format(inst)],
-                low=historical_data["{} low".format(inst)],
-                close=historical_data["{} close".format(inst)],
-                n=14
-            )
-            for pair in self.pairs:
-                # calculate the fastMA - slowMA
-                historical_data["{} ema{}".format(inst, str(pair))] = indicators_cal.ema_series(historical_data["{} close".format(inst)], n=pair[0]) \
-                                                                      - indicators_cal.ema_series(historical_data["{} close".format(inst)], n=pair[1])
-        # the historical_data has all the information required for backtesting
+        for date in historical_data.index:
+            for inst in instruments:
+                rolling_returns = historical_data.loc[:date].tail(60)["{} % ret".format(inst)]
+                skewness = skew(rolling_returns)
+                historical_data.loc[date, "{} skew".format(inst)] = skewness
         return historical_data
 
-    def run_simulation(self, historical_data, debug=False, use_disk = False):
+    def run_simulation(self, historical_data, debug=False, use_disk=False):
         """
         Init Params + Pre-processing
         """
         instruments = self.instruments_config["fx"] + self.instruments_config["indices"] + self.instruments_config["commodities"] + \
                       self.instruments_config["bonds"]
-
         if not use_disk:
             historical_data = self.extend_historicals(instruments=instruments, historical_data=historical_data)
             portfolio_df = pd.DataFrame(index=historical_data[self.simulation_start:].index).reset_index()
@@ -63,6 +58,7 @@ class Lbmom:
             is_halted = lambda inst, date: not np.isnan(historical_data.loc[date, "{} active".format(inst)]) and (
                 ~historical_data[:date].tail(3)["{} active".format(inst)]).any()
             # this means that in order to `not be a halted asset`, it needs to have actively traded over the all last 3 data points at the minimum
+            print(portfolio_df)
 
             """
             Run Simulation
@@ -103,13 +99,21 @@ class Lbmom:
                     portfolio_df.loc[i, "{} units".format(inst)] = 0
                     portfolio_df.loc[i, "{} w".format(inst)] = 0
 
-                nominal_total = 0
+                skews = {}
                 for inst in tradable:
-                    # vote long if fastMA > slowMA else no vote. We are trying to harvest momentum. We use MA pairs to proxy momentum, and define its
-                    # strength by fraction of trending pairs.
-                    votes = [1 if (historical_data.loc[date, "{} ema{}".format(inst, str(pair))] > 0) else 0 for pair in self.pairs]
-                    forecast = np.sum(votes) / len(votes)  # degree of momentum measured from 0 to 1. 1 if all trending, 0 if none trending
-                    forecast = 0 if historical_data.loc[date, "{} adx".format(inst)] < 25 else forecast  # if regime is not trending, set forecast to 0
+                    skews[inst] = historical_data.loc[date, "{} skew".format(inst)]
+                # TODO: check if below line is working correctly
+                skews = {k: v for k, v in sorted(skews.items(), key=lambda pair: pair[1])}
+                quantile_size = int(len(tradable) * 0.25)
+                high_skewness = list(skews.keys())[-quantile_size:]
+                low_skewness = list(skews.keys())[quantile_size:]
+
+                nominal_total = 0
+                # vol-targeting at the asset level - refer
+                for inst in tradable:
+                    forecast = 0
+                    forecast = 1 if inst in low_skewness else forecast
+                    forecast = -1 if inst in high_skewness else forecast
 
                     # vol_targeting
                     # dollar volatility assigned to a single position
@@ -127,11 +131,11 @@ class Lbmom:
                     # we should be using the position vol target instead of the portfolio vol target, since we already divided the capital
                     position = strat_scalar * forecast * position_vol_target / dollar_volatility
                     portfolio_df.loc[i, "{} units".format(inst)] = position
-                    backtest_unit_dollar_value = backtest_utils.unit_dollar_value(inst, historical_data, date)
-                    nominal_total += abs(position * backtest_unit_dollar_value)  # with FX conversion
+                    # TODO: debug backtest_utils
+                    backtest_utils_dollar_value = backtest_utils.unit_dollar_value(inst, historical_data, date)
+                    nominal_total += abs(position * backtest_utils_dollar_value)  # with FX conversion
 
                 # we see that for the first date, we manage to obtain the positions for the different assets that we want
-
                 nominal_total = backtest_utils.set_leverage_cap(portfolio_df, instruments, date, i, nominal_total, 10, historical_data)
 
                 for inst in tradable:
@@ -149,7 +153,6 @@ class Lbmom:
 
             # let us also store this inside an excel file, and what our strategy generates
             portfolio_df.set_index("date", inplace=True)
-
             diagnostic_utils.save_backtests(
                 portfolio_df=portfolio_df, instruments=instruments, brokerage_used=self.brokerage_used, sysname=self.sysname
             )
@@ -157,7 +160,6 @@ class Lbmom:
             diagnostic_utils.save_diagnostics(
                 portfolio_df=portfolio_df, instruments=instruments, brokerage_used=self.brokerage_used, sysname=self.sysname
             )
-
         else:
             portfolio_df = general_utils.load_file("./backtests/{}_{}.obj".format(self.brokerage_used, self.sysname))
 

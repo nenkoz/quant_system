@@ -9,13 +9,17 @@
     },
     "lsmom": {
       "oan": "./subsystems/LSMOM/oan_config.json"
+    },
+    "skprm": {
+      "oan": "./subsystems/SKPRM/oan_config.json"
     }
   },
 
   "subsystems": {
     "oan" : {
-      "lbmom": 0.5,
-      "lsmom": 0.5
+      "lbmom": 0.33,
+      "lsmom": 0.33,
+      "skprm": 0.33
     }
   }
 }

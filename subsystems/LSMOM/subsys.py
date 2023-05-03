@@ -161,6 +161,6 @@ class Lsmom:
 
         return portfolio_df, instruments
 
-    def get_subsys_pos(self, debug):
-        portfolio_df, instruments = self.run_simulation(historical_data=self.historical_df, debug=debug)
+    def get_subsys_pos(self, debug, use_disk):
+        portfolio_df, instruments = self.run_simulation(historical_data=self.historical_df, debug=debug, use_disk=use_disk)
         return portfolio_df, instruments

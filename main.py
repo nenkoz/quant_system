@@ -9,6 +9,8 @@ import quantlib.general_utils as gu
 from brokerage.oanda.oanda import Oanda
 from subsystems.LBMOM.subsys import Lbmom
 from subsystems.LSMOM.subsys import Lsmom
+from subsystems.SKPRM.subsys import Skprm
+
 
 with open("config/auth_config.json", "r") as f:
     auth_config = json.load(f)
@@ -93,14 +95,20 @@ def main():
                           simulation_start=sim_start,
                           vol_target=VOL_TARGET,
                           brokerage_used=brokerage_used)
+        elif subsystem == "skprm":
+            strat = Skprm(instruments_config=portfolio_config["instruments_config"][subsystem][brokerage_used],
+                          historical_df=historical_data,
+                          simulation_start=sim_start,
+                          vol_target=VOL_TARGET,
+                          brokerage_used=brokerage_used)
         else:
             pass
         strats[subsystem] = strat
 
     for k, v in strats.items():
         print("run: ", k, v)
-        #  the key, value pair of strategy name, strategy objeçct
-        strat_db, strat_inst = v.get_subsys_pos(debug=True)
+        #  the key, value pair of strategy name, strategy objeçt
+        strat_db, strat_inst = v.get_subsys_pos(debug=True, use_disk=True)
         print(strat_db, strat_inst)
 
 
