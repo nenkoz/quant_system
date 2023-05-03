@@ -206,6 +206,21 @@ def main():
     portfolio_df = run_simulation(traded, historical_data, VOL_TARGET, subsystem_dict, subsystems_config, brokerage_used)
     print(portfolio_df)
 
+    instruments_held = positions.keys()
+    instruments_unheld = [inst for inst in traded if inst not in instruments_held]
+    """
+    Edit open positions
+    """
+    for inst_held in instruments_held:
+        pass
+
+    """
+    Open new positions
+    """
+    for inst_unheld in instruments_unheld:
+        pass
+
+
 if __name__ == "__main__":
     main()
 
