@@ -1,4 +1,5 @@
 {
+  "order_enabled": true,
   "sim_years" : 1,
   "brokerage" : "oan",
   "vol_target" : 0.2,
